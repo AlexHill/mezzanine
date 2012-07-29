@@ -8,8 +8,8 @@ from mezzanine.pages import page_processors
 from mezzanine.pages.models import Page
 from mezzanine.utils.views import render
 
-
 page_processors.autodiscover()
+
 
 @staff_member_required
 def admin_page_ordering(request):
