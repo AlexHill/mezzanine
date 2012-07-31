@@ -8,10 +8,10 @@ from mezzanine.pages import page_processors
 from mezzanine.pages.models import Page
 from mezzanine.utils.views import render
 
-
 page_processors.autodiscover()
 
 
+@staff_member_required
 def admin_page_ordering(request):
     """
     Updates the ordering of pages via AJAX from within the admin.
@@ -34,14 +34,12 @@ def admin_page_ordering(request):
         if not moved_parent:
             moved_parent = None
         try:
-            page = Page.objects.get(id=moved_page)
-            page.parent_id = moved_parent
-            page.save()
-            page.reset_slugs()
+            page = Page.objects.select_related('parent').get(id=moved_page)
+            new_parent = Page.objects.get(id=moved_parent)
+            page.set_parent(new_parent)
         except Exception, e:
             return HttpResponse(str(e))
     return HttpResponse("ok")
-admin_page_ordering = staff_member_required(admin_page_ordering)
 
 
 def page(request, slug, template=u"pages/page.html", extra_context=None):
