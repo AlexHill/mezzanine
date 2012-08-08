@@ -62,6 +62,16 @@ if generic_comments:
     )
 
     register_setting(
+        name="COMMENTS_NOTIFICATION_EMAILS",
+        label=_("Comment notification email addresses"),
+        description=_("A comma separated list of email addresses that "
+                      "will receive an email notification each time a "
+                      "new comment is posted on the site."),
+        editable=True,
+        default="",
+    )
+
+    register_setting(
         name="COMMENTS_NUM_LATEST",
         label=_("Admin comments"),
         description=_("Number of latest comments shown in the admin "

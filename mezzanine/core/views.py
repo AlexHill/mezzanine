@@ -1,6 +1,7 @@
 
 from __future__ import with_statement
 import os
+from urlparse import urljoin, urlparse
 
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
@@ -93,9 +94,11 @@ def search(request, template="search_results.html"):
     settings.use_editable()
     query = request.GET.get("q", "")
     page = request.GET.get("page", 1)
-    results = paginate(Displayable.objects.search(query), page,
-                       settings.SEARCH_PER_PAGE, settings.MAX_PAGING_LINKS)
-    context = {"query": query, "results": results}
+    per_page = settings.SEARCH_PER_PAGE
+    max_paging_links = settings.MAX_PAGING_LINKS
+    results = Displayable.objects.search(query, for_user=request.user)
+    paginated = paginate(results, page, per_page, max_paging_links)
+    context = {"query": query, "results": paginated}
     return render(request, template, context)
 
 
@@ -130,6 +133,8 @@ def static_proxy(request):
             # on the same domain.
             mimetype = "text/html"
             static_url = settings.STATIC_URL + os.path.split(url)[0] + "/"
+            if not urlparse(static_url).scheme:
+                static_url = urljoin(host, static_url)
             base_tag = "<base href='%s'>" % static_url
             response = response.replace("<head>", "<head>" + base_tag)
     return HttpResponse(response, mimetype=mimetype)
