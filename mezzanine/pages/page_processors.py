@@ -10,7 +10,7 @@ from mezzanine.pages.models import Page
 processors = defaultdict(list)
 
 
-def processor_for(content_model_or_slug, exact_page=False):
+def processor_for(content_model_or_slug, exact_page=False, **kwargs):
     """
     Decorator that registers the decorated function as a page
     processor for the given content model or slug.
