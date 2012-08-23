@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.db.models import AutoField
 from django.forms import ValidationError, ModelForm
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.utils.translation import ugettext_lazy as _
 
@@ -130,6 +131,17 @@ class SingletonAdmin(admin.ModelAdmin):
     instance exists, and to the add view when it doesn't.
     """
 
+    def handle_save(self, request, response):
+        """
+        Handles redirect back to the dashboard when save is clicked
+        (eg not save and continue editing), by checking for a redirect
+        response, which only occurs if the form is valid.
+        """
+        form_valid = isinstance(response, HttpResponseRedirect)
+        if request.POST.get("_save") and form_valid:
+            return redirect("admin:index")
+        return response
+
     def add_view(self, *args, **kwargs):
         """
         Redirect to the change view if the singleton instance exists.
@@ -137,10 +149,11 @@ class SingletonAdmin(admin.ModelAdmin):
         try:
             singleton = self.model.objects.get()
         except (self.model.DoesNotExist, self.model.MultipleObjectsReturned):
-            return super(SingletonAdmin, self).add_view(*args, **kwargs)
-        else:
-            change_url = admin_url(self.model, "change", singleton.id)
-            return redirect(change_url)
+            kwargs.setdefault("extra_context", {})
+            kwargs["extra_context"]["singleton"] = True
+            response = super(SingletonAdmin, self).add_view(*args, **kwargs)
+            return self.handle_save(args[0], response)
+        return redirect(admin_url(self.model, "change", singleton.id))
 
     def changelist_view(self, *args, **kwargs):
         """
@@ -152,28 +165,16 @@ class SingletonAdmin(admin.ModelAdmin):
         except self.model.MultipleObjectsReturned:
             return super(SingletonAdmin, self).changelist_view(*args, **kwargs)
         except self.model.DoesNotExist:
-            add_url = admin_url(self.model, "add")
-            return redirect(add_url)
-        else:
-            change_url = admin_url(self.model, "change", singleton.id)
-            return redirect(change_url)
+            return redirect(admin_url(self.model, "add"))
+        return redirect(admin_url(self.model, "change", singleton.id))
 
-    def change_view(self, request, object_id, extra_context=None):
+    def change_view(self, *args, **kwargs):
         """
         If only the singleton instance exists, pass ``True`` for
         ``singleton`` into the template which will use CSS to hide
         the "save and add another" button.
         """
-        if extra_context is None:
-            extra_context = {}
-        try:
-            self.model.objects.get()
-        except (self.model.DoesNotExist, self.model.MultipleObjectsReturned):
-            pass
-        else:
-            extra_context["singleton"] = True
-        response = super(SingletonAdmin, self).change_view(request, object_id,
-                                                           extra_context)
-        if request.POST.get("_save"):
-            response = redirect("admin:index")
-        return response
+        kwargs.setdefault("extra_context", {})
+        kwargs["extra_context"]["singleton"] = self.model.objects.count() == 1
+        response = super(SingletonAdmin, self).change_view(*args, **kwargs)
+        return self.handle_save(args[0], response)
