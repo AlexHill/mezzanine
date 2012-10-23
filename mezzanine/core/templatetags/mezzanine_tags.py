@@ -20,7 +20,13 @@ from django.utils.html import strip_tags
 from django.utils.simplejson import loads
 from django.utils.text import capfirst
 
-from PIL import Image, ImageFile, ImageOps
+# Try to import PIL in either of the two ways it can end up installed.
+try:
+    from PIL import Image, ImageFile, ImageOps
+except ImportError:
+    import Image
+    import ImageFile
+    import ImageOps
 
 from mezzanine.conf import settings
 from mezzanine.core.fields import RichTextField
@@ -249,7 +255,13 @@ def thumbnail(image_url, width, height, quality=95):
         # Requested image does not exist, just return its URL.
         return image_url
 
-    image = Image.open(default_storage.open(image_url))
+    f = default_storage.open(image_url)
+    try:
+        image = Image.open(f)
+    except:
+        # Invalid image format
+        return image_url
+
     image_info = image.info
     width = int(width)
     height = int(height)
