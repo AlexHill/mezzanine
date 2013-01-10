@@ -4,6 +4,7 @@ from string import punctuation
 
 from django.db.models import Manager, Q, CharField, TextField, get_models
 from django.db.models.query import QuerySet
+from django.db.models.fields.related import OneToOneField
 from django.contrib.sites.managers import CurrentSiteManager as DjangoCSM
 
 from mezzanine.conf import settings
@@ -35,7 +36,69 @@ class PublishedManager(Manager):
         return self.get(slug=slug)
 
 
-class SearchableQuerySet(QuerySet):
+class InheritanceQuerySet(QuerySet):
+    """
+    QuerySet that supplies select_subclasses() cast filter.
+    https://bitbucket.org/carljm/django-model-utils
+    """
+    def select_subclasses(self, *subclasses):
+        if not subclasses:
+            subclasses = [rel.var_name
+                          for rel in self.model._meta.get_all_related_objects()
+                          if isinstance(rel.field, OneToOneField)
+            and issubclass(rel.field.model, self.model)]
+        new_qs = self.select_related(*subclasses)
+        new_qs.subclasses = subclasses
+        return new_qs
+
+    def _clone(self, klass=None, setup=False, **kwargs):
+        for name in ['subclasses', '_annotated']:
+            if hasattr(self, name):
+                kwargs[name] = getattr(self, name)
+        return super(InheritanceQuerySet, self)._clone(klass, setup, **kwargs)
+
+    def annotate(self, *args, **kwargs):
+        qset = super(InheritanceQuerySet, self).annotate(*args, **kwargs)
+        qset._annotated = [a.default_alias for a in args] + kwargs.keys()
+        return qset
+
+    def iterator(self):
+        iter = super(InheritanceQuerySet, self).iterator()
+        if getattr(self, 'subclasses', False):
+            for obj in iter:
+                sub_obj = [getattr(obj, s)
+                           for s in self.subclasses
+                           if getattr(obj, s)] or [obj]
+                sub_obj = sub_obj[0]
+                if getattr(self, '_annotated', False):
+                    for k in self._annotated:
+                        setattr(sub_obj, k, getattr(obj, k))
+
+                yield sub_obj
+        else:
+            for obj in iter:
+                yield obj
+
+
+class InheritanceManager(Manager):
+    """
+    Manager that allows queries on a base model to return heterogenous
+    results of the actual proper subtypes, without any additional queries
+    https://bitbucket.org/carljm/django-model-utils
+    """
+    use_for_related_fields = True
+
+    def get_query_set(self):
+        return InheritanceQuerySet(self.model)
+
+    def select_subclasses(self, *subclasses):
+        return self.get_query_set().select_subclasses(*subclasses)
+
+    def get_subclass(self, *args, **kwargs):
+        return self.get_query_set().select_subclasses().get(*args, **kwargs)
+
+
+class SearchableQuerySet(InheritanceQuerySet):
     """
     QuerySet providing main search functionality for
     ``SearchableManager``.
@@ -80,11 +143,11 @@ class SearchableQuerySet(QuerySet):
                 search_fields.update(search_fields_to_dict(super_fields))
         if len(search_fields) == 0:
             search_fields = [f.name for f in self.model._meta.fields
-                if issubclass(f.__class__, CharField) or
-                issubclass(f.__class__, TextField)]
+                             if issubclass(f.__class__, CharField) or
+                                issubclass(f.__class__, TextField)]
         if len(search_fields) == 0:
             return self.none()
-        # Search fields can be a dict or sequence of pairs mapping
+            # Search fields can be a dict or sequence of pairs mapping
         # fields to their relevant weight in ordering the results.
         # If a mapping isn't used then assume a sequence of field
         # names and give them equal weighting.
@@ -95,29 +158,29 @@ class SearchableQuerySet(QuerySet):
         #### BUILD LIST OF TERMS TO SEARCH FOR ###
 
         # Remove extra spaces, put modifiers inside quoted terms.
-        terms = " ".join(query.split()).replace("+ ", "+")     \
-                                       .replace('+"', '"+')    \
-                                       .replace("- ", "-")     \
-                                       .replace('-"', '"-')    \
-                                       .split('"')
+        terms = " ".join(query.split()).replace("+ ", "+")\
+        .replace('+"', '"+')\
+        .replace("- ", "-")\
+        .replace('-"', '"-')\
+        .split('"')
         # Strip punctuation other than modifiers from terms and create
         # terms list, first from quoted terms and then remaining words.
         terms = [("" if t[0] not in "+-" else t[0]) + t.strip(punctuation)
-            for t in terms[1::2] + "".join(terms[::2]).split()]
+                 for t in terms[1::2] + "".join(terms[::2]).split()]
         # Remove stop words from terms that aren't quoted or use
         # modifiers, since words with these are an explicit part of
         # the search query. If doing so ends up with an empty term
         # list, then keep the stop words.
         terms_no_stopwords = [t for t in terms if t.lower() not in
-            settings.STOP_WORDS]
+                                                  settings.STOP_WORDS]
         get_positive_terms = lambda terms: [t.lower().strip(punctuation)
-            for t in terms if t[0] != "-"]
+                                            for t in terms if t[0] != "-"]
         positive_terms = get_positive_terms(terms_no_stopwords)
         if positive_terms:
             terms = terms_no_stopwords
         else:
             positive_terms = get_positive_terms(terms)
-        # Append positive terms (those without the negative modifier)
+            # Append positive terms (those without the negative modifier)
         # to the internal list for sorting when results are iterated.
         if not positive_terms:
             return self.none()
@@ -127,12 +190,15 @@ class SearchableQuerySet(QuerySet):
         #### BUILD QUERYSET FILTER ###
 
         # Create the queryset combining each set of terms.
-        excluded = [reduce(iand, [~Q(**{"%s__icontains" % f: t[1:]}) for f in
-            search_fields.keys()]) for t in terms if t[0] == "-"]
-        required = [reduce(ior, [Q(**{"%s__icontains" % f: t[1:]}) for f in
-            search_fields.keys()]) for t in terms if t[0] == "+"]
-        optional = [reduce(ior, [Q(**{"%s__icontains" % f: t}) for f in
-            search_fields.keys()]) for t in terms if t[0] not in "+-"]
+        excluded = [reduce(iand, [~Q(**{"%s__icontains" % f: t[1:]})
+                                  for f in search_fields.keys()])
+                    for t in terms if t[0] == "-"]
+        required = [reduce(ior, [Q(**{"%s__icontains" % f: t[1:]})
+                                 for f in search_fields.keys()])
+                    for t in terms if t[0] == "+"]
+        optional = [reduce(ior, [Q(**{"%s__icontains" % f: t})
+                                 for f in search_fields.keys()])
+                    for t in terms if t[0] not in "+-"]
         queryset = self
         if excluded:
             queryset = queryset.filter(reduce(iand, excluded))
@@ -181,7 +247,7 @@ class SearchableQuerySet(QuerySet):
         return results
 
 
-class SearchableManager(Manager):
+class SearchableManager(InheritanceManager):
     """
     Manager providing a chainable queryset.
     Adapted from http://www.djangosnippets.org/snippets/562/
