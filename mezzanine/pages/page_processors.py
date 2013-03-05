@@ -2,6 +2,7 @@
 from collections import defaultdict
 
 from django.db.models import get_model
+from django.http import HttpResponse
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 
@@ -10,6 +11,29 @@ from mezzanine.pages.models import Page
 
 
 processors = defaultdict(list)
+
+
+def run_page_processors(processors, request, page):
+
+    context_data = {}
+    for (processor, exact_page) in processors:
+        if exact_page and not page.is_current:
+            continue
+        processor_response = processor(request, page)
+        if isinstance(processor_response, HttpResponse):
+            return processor_response
+        elif processor_response:
+            try:
+                for k in processor_response:
+                    if k not in context_data:
+                        context_data[k] = processor_response[k]
+            except (TypeError, ValueError):
+                name = "%s.%s" % (processor.__module__, processor.__name__)
+                error = ("The page processor %s returned %s but must "
+                         "return HttpResponse or dict." %
+                         (name, type(processor_response)))
+                raise ValueError(error)
+    return context_data
 
 
 def processor_for(content_model_or_slug, exact_page=False):

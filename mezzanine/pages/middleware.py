@@ -77,22 +77,16 @@ class PageMiddleware(object):
         # Run page processors.
         model_processors = page_processors.processors[page.content_model]
         slug_processors = page_processors.processors["slug:%s" % page.slug]
-        for (processor, exact_page) in slug_processors + model_processors:
-            if exact_page and not page.is_current:
-                continue
-            processor_response = processor(request, page)
-            if isinstance(processor_response, HttpResponse):
-                return processor_response
-            elif processor_response:
-                try:
-                    for k in processor_response:
-                        if k not in response.context_data:
-                            response.context_data[k] = processor_response[k]
-                except (TypeError, ValueError):
-                    name = "%s.%s" % (processor.__module__, processor.__name__)
-                    error = ("The page processor %s returned %s but must "
-                             "return HttpResponse or dict." %
-                             (name, type(processor_response)))
-                    raise ValueError(error)
+
+        processor_response = page_processors.run_page_processors(
+            slug_processors + model_processors,
+            request, page)
+
+        if isinstance(processor_response, HttpResponse):
+            return processor_response
+        else:
+            for k in (k for k in processor_response.viewkeys()
+                      if k not in response.context_data):
+                response.context_data[k] = processor_response[k]
 
         return response
