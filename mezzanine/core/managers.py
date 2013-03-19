@@ -99,6 +99,23 @@ class InheritanceManager(Manager):
         return self.get_query_set().select_subclasses().get(*args, **kwargs)
 
 
+def search_fields_to_dict(fields):
+    """
+    In ``SearchableQuerySet`` and ``SearchableManager``, search fields
+    can either be a sequence, or a dict of fields mapped to weights.
+    This function converts sequences to a dict mapped to even weights,
+    so that we're consistently dealing with a dict of fields mapped to
+    weights, eg: ("title", "content") -> {"title": 1, "content": 1}
+    """
+    if not fields:
+        return {}
+    try:
+        int(dict(fields).values()[0])
+    except (TypeError, ValueError):
+        fields = dict(zip(fields, [1] * len(fields)))
+    return fields
+
+
 class SearchableQuerySet(InheritanceQuerySet):
     """
     QuerySet providing main search functionality for
@@ -119,42 +136,14 @@ class SearchableQuerySet(InheritanceQuerySet):
         to require and exclude.
         """
 
-        def search_fields_to_dict(fields):
-            """
-            Convert a sequence of fields to a weighted dict.
-            """
-            if not fields:
-                return {}
-            try:
-                int(dict(fields).values()[0])
-            except (TypeError, ValueError):
-                fields = dict(zip(fields, [1] * len(fields)))
-            return fields
-
         #### DETERMINE FIELDS TO SEARCH ###
 
-        # Use fields arg if given, otherwise check internal list which
-        # if empty, populate from model attr or char-like fields.
-        if search_fields is None:
-            search_fields = self._search_fields
-        if len(search_fields) == 0:
-            search_fields = {}
-            for cls in reversed(self.model.__mro__):
-                super_fields = getattr(cls, "search_fields", {})
-                search_fields.update(search_fields_to_dict(super_fields))
-        if len(search_fields) == 0:
-            search_fields = [f.name for f in self.model._meta.fields
-                             if issubclass(f.__class__, CharField) or
-                                issubclass(f.__class__, TextField)]
-        if len(search_fields) == 0:
+        # Use search_fields arg if given, otherwise use search_fields
+        # initially configured by the manager class.
+        if search_fields:
+            self._search_fields = search_fields_to_dict(search_fields)
+        if not self._search_fields:
             return self.none()
-            # Search fields can be a dict or sequence of pairs mapping
-        # fields to their relevant weight in ordering the results.
-        # If a mapping isn't used then assume a sequence of field
-        # names and give them equal weighting.
-        if not isinstance(self._search_fields, dict):
-            self._search_fields = {}
-        self._search_fields.update(search_fields_to_dict(search_fields))
 
         #### BUILD LIST OF TERMS TO SEARCH FOR ###
 
@@ -192,11 +181,11 @@ class SearchableQuerySet(InheritanceQuerySet):
 
         # Create the queryset combining each set of terms.
         excluded = [reduce(iand, [~Q(**{"%s__icontains" % f: t[1:]}) for f in
-            search_fields.keys()]) for t in terms if t[0:1] == "-"]
+            self._search_fields.keys()]) for t in terms if t[0:1] == "-"]
         required = [reduce(ior, [Q(**{"%s__icontains" % f: t[1:]}) for f in
-            search_fields.keys()]) for t in terms if t[0:1] == "+"]
+            self._search_fields.keys()]) for t in terms if t[0:1] == "+"]
         optional = [reduce(ior, [Q(**{"%s__icontains" % f: t}) for f in
-            search_fields.keys()]) for t in terms if t[0:1] not in "+-"]
+            self._search_fields.keys()]) for t in terms if t[0:1] not in "+-"]
         queryset = self
         if excluded:
             queryset = queryset.filter(reduce(iand, excluded))
@@ -254,11 +243,46 @@ class SearchableManager(InheritanceManager):
     """
 
     def __init__(self, *args, **kwargs):
-        self._search_fields = kwargs.pop("search_fields", [])
+        self._search_fields = kwargs.pop("search_fields", {})
         super(SearchableManager, self).__init__(*args, **kwargs)
 
-    def get_query_set(self):
+    def get_search_fields(self):
+        """
+        Returns the search field names mapped to weights as a dict.
+        Used in ``get_query_set`` below to tell ``SearchableQuerySet``
+        which search fields to use. Also used by ``DisplayableAdmin``
+        to populate Django admin's ``search_fields`` attribute.
+
+        Search fields can be populated via
+        ``SearchableManager.__init__``, which then get stored in
+        ``SearchableManager._search_fields``, which serves as an
+        approach for defining an explicit set of fields to be used.
+
+        Alternatively and more commonly, ``search_fields`` can be
+        defined on models themselves. In this case, we look at the
+        model and all its base classes, and build up the search
+        fields from all of those, so the search fields are implicitly
+        built up from the inheritence chain.
+
+        Finally if no search fields have been defined at all, we
+        fall back to any fields that are ``CharField`` or ``TextField``
+        instances.
+        """
         search_fields = self._search_fields
+        if not search_fields:
+            for cls in reversed(self.model.__mro__):
+                super_fields = getattr(cls, "search_fields", {})
+                search_fields.update(search_fields_to_dict(super_fields))
+        if not search_fields:
+            search_fields = []
+            for f in self.model._meta.fields:
+                if isinstance(f, (CharField, TextField)):
+                    search_fields.append(f.name)
+            search_fields = search_fields_to_dict(search_fields)
+        return search_fields
+
+    def get_query_set(self):
+        search_fields = self.get_search_fields()
         return SearchableQuerySet(self.model, search_fields=search_fields)
 
     def contribute_to_class(self, model, name):
