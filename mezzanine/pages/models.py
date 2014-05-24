@@ -1,5 +1,8 @@
 from __future__ import unicode_literals
 from future.builtins import filter, str
+from future.utils import with_metaclass
+from mezzanine.boot.models import extensible_meta
+
 try:
     from urllib.parse import urljoin
 except ImportError:     # Python 2
@@ -31,7 +34,7 @@ class BasePage(Orderable, Displayable):
 
 
 @python_2_unicode_compatible
-class Page(BasePage):
+class Page(with_metaclass(extensible_meta(__name__), BasePage)):
     """
     A page in the page tree. This is the base class that custom content types
     need to subclass.

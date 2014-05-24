@@ -21,6 +21,17 @@ from mezzanine.boot.lazy_admin import LazyAdminSite
 from mezzanine.utils.importing import import_dotted_path
 
 
+def mixinto(core_class):
+    def decorator(user_class):
+        try:
+            mixinto.registry[core_class].append(user_class)
+        except AttributeError:
+            raise RuntimeError("Can't @mixinto %s, because it has already been loaded" % core_class)
+        return user_class
+    return decorator
+mixinto.registry = defaultdict(list)
+
+
 # Convert ``EXTRA_MODEL_FIELDS`` into a more usable structure, a
 # dictionary mapping module.model paths to dicts of field names mapped
 # to field instances to inject, with some sanity checking to ensure
