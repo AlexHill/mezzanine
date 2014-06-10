@@ -515,8 +515,8 @@ Sites Using Mezzanine
 * `MODCo Group <http://modcogroup.com/>`_
 * `Terminal Labs <http://www.terminallabs.com>`_
 * `Resource Management Companies <http://rmcrecycle.com>`_
-* `Humboldt Community Christian School <http://humboldtccs.org/>`_
 * `DollFires <http://dollfires.com>`_
+* `Quantifind <http://quantifind.com/>`_
 
 
 Quotes
