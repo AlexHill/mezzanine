@@ -176,18 +176,24 @@ Please note the following guidelines for contributing:
 * If you are adding new functionality, you must include basic tests
   and documentation.
 
-If you want to do development with mezzanine, here's a quick way to set
-up a development environment and run the unit tests, using
-`virtualenvwrapper`_ to set up a virtualenv::
+Here's a quick start to hacking on Mezzanine after forking it on
+GitHub, by using the internal "project_template" as your current
+project::
 
-    $ mkvirtualenv mezzanine
-    $ workon mezzanine
-    $ pip install Django pep8 pyflakes
-    $ git clone https://github.com/stephenmcd/mezzanine/
+    $ git clone https://github.com/your-github-username/mezzanine/
     $ cd mezzanine
+    $ git checkout -b your-new-branch-name
+    $ cp mezzanine/project_template/local_settings.py{.template,}
     $ python setup.py develop
-    $ cp mezzanine/project_template/local_settings.py.template mezzanine/project_template/local_settings.py
-    $ ./mezzanine/project_template/manage.py test
+    $ python mezzanine/project_template/manage.py createdb --noinput
+    $ python mezzanine/project_template/manage.py runserver
+
+    "hack hack hack"
+
+    $ python setup.py test
+    $ git commit -am "A message describing what you changed."
+    $ git push origin your-new-branch-name
+
 
 Language Translations
 =====================
@@ -537,6 +543,9 @@ Sites Using Mezzanine
 * `DataKind <http://www.datakind.org/>`_
 * `New Zealand Institute of Economic Research <http://nzier.org.nz/>`_
 * `CodingHouse <http://thecodinghouse.in>`_
+* `Triple J Products <http://triplejcoilproducts.com>`_
+* `Aaron E. Balderas <http://abalderas.com>`_
+* `DVD.nl <http://dvd.nl/>`_
 
 
 Quotes
