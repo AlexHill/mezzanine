@@ -8,7 +8,6 @@ from __future__ import unicode_literals
 from future.builtins import bytes, str
 
 from functools import partial
-from threading import Lock
 from warnings import warn
 
 from django.conf import settings as django_settings
@@ -130,7 +129,6 @@ class Settings(object):
         the database that are no longer registered, and emit a warning if
         there are settings that are defined in settings.py and the database.
         """
-
         from mezzanine.conf.models import Setting
 
         removed_settings = []
