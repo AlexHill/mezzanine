@@ -57,14 +57,16 @@ def build_settings_docs(docs_path, prefix=None):
         if isinstance(setting_default, str):
             if gethostname() in setting_default or (
                 setting_default.startswith("/") and
-                os.path.exists(setting_default)):
+                    os.path.exists(setting_default)):
                 setting_default = dynamic
         if setting_default != dynamic:
             setting_default = repr(deep_force_unicode(setting_default))
         lines.extend(["", settings_name, "-" * len(settings_name)])
-        lines.extend(["", urlize(setting["description"] or ""
-            ).replace("<a href=\"", "`"
-            ).replace("\" rel=\"nofollow\">", " <").replace("</a>", ">`_")])
+        lines.extend(["",
+            urlize(setting["description"] or "").replace(
+                "<a href=\"", "`").replace(
+                "\" rel=\"nofollow\">", " <").replace(
+                "</a>", ">`_")])
         if setting["choices"]:
             choices = ", ".join(["%s: ``%s``" % (str(v), force_text(k))
                                  for k, v in setting["choices"]])
@@ -150,8 +152,8 @@ def build_changelog(docs_path, package_name="mezzanine"):
         words = description.split()
         # Format var names in commit.
         for i, word in enumerate(words):
-            if (set("._") & set(word[:-1]) and set(letters) & set(word)
-                and "`" not in word and not word[0].isdigit()):
+            if (set("._") & set(word[:-1]) and set(letters) & set(word) and
+                    "`" not in word and not word[0].isdigit()):
                 last = ""
                 if word[-1] in ",.":
                     last, word = word[-1], word[:-1]
@@ -196,7 +198,7 @@ def build_changelog(docs_path, package_name="mezzanine"):
         ignored = [w for w in ignore if w.lower() in description.lower()]
         one_word = len(description.split()) == 1
         if (merge or new_version or branch_closed or changelog_update or
-            ignored or one_word):
+                ignored or one_word):
             continue
         # Ensure we have a current version and if so, add this changeset's
         # description to it.

@@ -168,6 +168,7 @@ class Page(with_metaclass(extensible_meta(__name__), BasePage)):
                 page.slug = new_slug + page.slug[len(self.slug):]
                 page.save()
         self.slug = new_slug
+        self.save()
 
     def set_parent(self, new_parent):
         """

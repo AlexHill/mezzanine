@@ -108,7 +108,8 @@ class ProfileForm(Html5Mixin, forms.ModelForm):
                     self.fields[field].required = False
                     if field == "password1":
                         self.fields[field].help_text = ugettext(
-                        "Leave blank unless you want to change your password")
+                                               "Leave blank unless you want "
+                                               "to change your password")
 
         # Add any profile fields to the form.
         try:
@@ -218,7 +219,7 @@ class ProfileForm(Html5Mixin, forms.ModelForm):
         if self._signup:
             settings.use_editable()
             if (settings.ACCOUNTS_VERIFICATION_REQUIRED or
-                settings.ACCOUNTS_APPROVAL_REQUIRED):
+                    settings.ACCOUNTS_APPROVAL_REQUIRED):
                 user.is_active = False
                 user.save()
             else:

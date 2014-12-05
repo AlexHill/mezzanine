@@ -1,8 +1,11 @@
 from __future__ import unicode_literals
 from future.builtins import str
 
+from django import VERSION
+from django.contrib.auth.models import AnonymousUser
 from django.db import connection
 from django.template import Context, Template
+from django.test.utils import override_settings
 
 from mezzanine.conf import settings
 from mezzanine.core.models import CONTENT_STATUS_PUBLISHED
@@ -11,7 +14,7 @@ from mezzanine.pages.models import Page, RichTextPage
 from mezzanine.urls import PAGES_SLUG
 from mezzanine.utils.tests import TestCase
 from mezzanine.utils.models import get_user_model
-from django.contrib.auth.models import AnonymousUser
+
 
 User = get_user_model()
 
@@ -124,7 +127,6 @@ class PagesTests(TestCase):
         child, _ = RichTextPage.objects.get_or_create(
             title="Child", slug="parent/child", parent_id=parent.id)
         parent.set_slug("new-parent-slug")
-        parent.save()
         self.assertTrue(parent.slug == "new-parent-slug")
 
         parent = RichTextPage.objects.get(id=parent.id)
@@ -134,30 +136,69 @@ class PagesTests(TestCase):
         self.assertTrue(child.slug == "new-parent-slug/child")
 
     def test_login_required(self):
-
         public, _ = RichTextPage.objects.get_or_create(
             title="Public", slug="public", login_required=False)
         private, _ = RichTextPage.objects.get_or_create(
             title="Private", slug="private", login_required=True)
+        accounts_installed = ("mezzanine.accounts" in settings.INSTALLED_APPS)
 
         args = {"for_user": AnonymousUser()}
         self.assertTrue(public in RichTextPage.objects.published(**args))
-        self.assertTrue(not private in RichTextPage.objects.published(**args))
+        self.assertTrue(private not in RichTextPage.objects.published(**args))
         args = {"for_user": User.objects.get(username=self._username)}
         self.assertTrue(public in RichTextPage.objects.published(**args))
         self.assertTrue(private in RichTextPage.objects.published(**args))
-        self.client.logout()
 
-        response = self.client.get(private.get_absolute_url(), follow=True)
-        login = "%s?next=%s" % (settings.LOGIN_URL, private.get_absolute_url())
-        self.assertRedirects(response, login)
-        response = self.client.get(public.get_absolute_url(), follow=True)
+        public_url = public.get_absolute_url()
+        private_url = private.get_absolute_url()
+
+        self.client.logout()
+        response = self.client.get(private_url, follow=True)
+        login = "%s?next=%s" % (settings.LOGIN_URL, private_url)
+        if accounts_installed:
+            # For an inaccessible page with mezzanine.accounts we should
+            # see a login page, without it 404 is more appropriate than an
+            # admin login.
+            target_status_code = 200
+        else:
+            target_status_code = 404
+        self.assertRedirects(response, login,
+                             target_status_code=target_status_code)
+        response = self.client.get(public_url, follow=True)
         self.assertEqual(response.status_code, 200)
+
+        if accounts_installed and VERSION >= (1, 5):
+            # Test if view name or URL pattern can be used as LOGIN_URL.
+            with override_settings(LOGIN_URL="mezzanine.accounts.views.login"):
+                # Note: With 1.7 this loops if the view app isn't installed.
+                response = self.client.get(public_url, follow=True)
+                self.assertEqual(response.status_code, 200)
+                response = self.client.get(private_url, follow=True)
+                self.assertRedirects(response, login)
+            with override_settings(LOGIN_URL="login"):
+                # Note: The "login" is a pattern name in accounts.urls.
+                response = self.client.get(public_url, follow=True)
+                self.assertEqual(response.status_code, 200)
+                response = self.client.get(private_url, follow=True)
+                self.assertRedirects(response, login)
+
         self.client.login(username=self._username, password=self._password)
-        response = self.client.get(private.get_absolute_url(), follow=True)
+        response = self.client.get(private_url, follow=True)
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(public.get_absolute_url(), follow=True)
+        response = self.client.get(public_url, follow=True)
         self.assertEqual(response.status_code, 200)
+
+        if accounts_installed and VERSION >= (1, 5):
+            with override_settings(LOGIN_URL="mezzanine.accounts.views.login"):
+                response = self.client.get(public_url, follow=True)
+                self.assertEqual(response.status_code, 200)
+                response = self.client.get(private_url, follow=True)
+                self.assertEqual(response.status_code, 200)
+            with override_settings(LOGIN_URL="login"):
+                response = self.client.get(public_url, follow=True)
+                self.assertEqual(response.status_code, 200)
+                response = self.client.get(private_url, follow=True)
+                self.assertEqual(response.status_code, 200)
 
     def test_page_menu_queries(self):
         """
@@ -194,38 +235,21 @@ class PagesTests(TestCase):
 
     def test_page_menu_default(self):
         """
-        Test that the default value for the ``in_menus`` field is used
-        and that it doesn't get forced to unicode.
+        Test that the settings-defined default value for the ``in_menus``
+        field is used, also checking that it doesn't get forced to text,
+        but that sequences are made immutable.
         """
-        old_menu_temp = settings.PAGE_MENU_TEMPLATES
-        old_menu_temp_def = settings.PAGE_MENU_TEMPLATES_DEFAULT
-        try:
-            # MenusField initializes choices and default during model
-            # loading, so we can't just override settings.
-            from mezzanine.pages.models import BasePage
-            from mezzanine.pages.fields import MenusField
-            settings.PAGE_MENU_TEMPLATES = ((8, 'a', 'a'), (9, 'b', 'b'))
-
-            settings.PAGE_MENU_TEMPLATES_DEFAULT = None
-
-            class P1(BasePage):
-                in_menus = MenusField(blank=True, null=True)
-            self.assertEqual(P1().in_menus[0], 8)
-
-            settings.PAGE_MENU_TEMPLATES_DEFAULT = tuple()
-
-            class P2(BasePage):
-                in_menus = MenusField(blank=True, null=True)
-            self.assertEqual(P2().in_menus, None)
-
-            settings.PAGE_MENU_TEMPLATES_DEFAULT = [9]
-
-            class P3(BasePage):
-                in_menus = MenusField(blank=True, null=True)
-            self.assertEqual(P3().in_menus[0], 9)
-        finally:
-            settings.PAGE_MENU_TEMPLATES = old_menu_temp
-            settings.PAGE_MENU_TEMPLATES_DEFAULT = old_menu_temp_def
+        with override_settings(
+                PAGE_MENU_TEMPLATES=((8, "a", "a"), (9, "b", "b"))):
+            with override_settings(PAGE_MENU_TEMPLATES_DEFAULT=None):
+                page_in_all_menus = Page.objects.create()
+                self.assertEqual(page_in_all_menus.in_menus, (8, 9))
+            with override_settings(PAGE_MENU_TEMPLATES_DEFAULT=tuple()):
+                page_not_in_menus = Page.objects.create()
+                self.assertEqual(page_not_in_menus.in_menus, tuple())
+            with override_settings(PAGE_MENU_TEMPLATES_DEFAULT=[9]):
+                page_in_a_menu = Page.objects.create()
+                self.assertEqual(page_in_a_menu.in_menus, (9,))
 
     def test_overridden_page(self):
         """

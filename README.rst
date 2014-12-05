@@ -291,8 +291,9 @@ You can also add modules to the `Mezzanine Grid on djangopackages.com`_.
   platform.
 * `mezzanine-bsbanners`_ - Add `Twitter Bootstrap`_ Carousels and
   Jumbotrons to Mezzanine.
-* `mezzanine-business-theme` Starter business theme for Mezzanine.
-* `open-helpdesk` A helpdesk app built with Mezzanine.
+* `mezzanine-business-theme`_ Starter business theme for Mezzanine.
+* `open-helpdesk`_ A helpdesk app built with Mezzanine.
+* `mezzanine-invites`_ Allow site registration via alphanumeric invite codes.
 
 
 Donating
@@ -553,6 +554,12 @@ Sites Using Mezzanine
 * `Potrillo al Pie <http://potrilloalpie.com/>`_
 * `Skyfalk Web Studio <http://skyfalk.ru>`_
 * `Firefox OS Partners <https://mobilepartners.mozilla.org/>`_
+* `You Name It <http://you-name-it.net>`_
+* `Atlas of Human Infectious Diseases <https://infectionatlas.org>`_
+* `The Entrepreneurial School <http://theentrepreneurialschool.com/>`_
+* `Wednesday Martin <http://wednesdaymartin.com/>`_
+* `Avaris to Avanim <https://avaristoavanim.com>`_
+
 
 Quotes
 ======
@@ -721,6 +728,7 @@ Quotes
 .. _`mezzanine-bsbanners`: https://pypi.python.org/pypi/mezzanine-bsbanners
 .. _`mezzanine-business-theme`: https://github.com/dfalk/mezzanine-business-themebsbanners
 .. _`open-helpdesk`: https://github.com/simodalla/open-helpdesk
+.. _`mezzanine-invites`: https://github.com/averagehuman/mezzanine-invites
 
 
 .. PEOPLE WITH QUOTES

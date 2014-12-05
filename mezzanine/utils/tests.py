@@ -8,6 +8,7 @@ from shutil import copyfile, copytree
 from django.db import connection
 from django.template import Context, Template
 from django.test import TestCase as BaseTestCase
+from django.test.client import RequestFactory
 
 from mezzanine.conf import settings
 from mezzanine.utils.importing import path_for_import
@@ -45,8 +46,8 @@ IGNORE_ERRORS = (
     # Django 1.5 custom user compatibility
     "redefinition of unused 'get_user_model",
 
-    # Deprecated compat timezones for Django 1.3
-    "mezzanine/utils/timezone",
+    # Django 1.5 deprecated methods compatibility.
+    "'get_permission_codename' imported but unused",
 
     # Actually a Python template file.
     "live_settings.py",
@@ -62,8 +63,9 @@ class TestCase(BaseTestCase):
 
     def setUp(self):
         """
-        Creates an admin user and sets up the debug cursor, so that
-        we can track the number of queries used in various places.
+        Creates an admin user, sets up the debug cursor, so that we can
+        track the number of queries used in various places, and creates
+        a request factory for views testing.
         """
         self._username = "test"
         self._password = "test"
@@ -71,6 +73,7 @@ class TestCase(BaseTestCase):
         args = (self._username, self._emailaddress, self._password)
         self._user = User.objects.create_superuser(*args)
         self._debug_cursor = connection.use_debug_cursor
+        self._request_factory = RequestFactory()
         connection.use_debug_cursor = True
 
     def tearDown(self):
@@ -138,8 +141,8 @@ def _run_checker_for_package(checker, package_name, extra_ignore=None):
     package_path = path_for_import(package_name)
     for (root, dirs, files) in os.walk(str(package_path)):
         for f in files:
-            if (f == "local_settings.py" or not f.endswith(".py")
-                or root.split(os.sep)[-1] == "migrations"):
+            if (f == "local_settings.py" or not f.endswith(".py") or
+                    root.split(os.sep)[-1] in ["migrations", "south"]):
                 # Ignore
                 continue
             for warning in checker(os.path.join(root, f)):

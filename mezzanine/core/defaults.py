@@ -130,8 +130,7 @@ register_setting(
             "TS21i-10", "UP.Browser", "UP.Link", "webOS", "Windows CE",
             "WinWAP", "YahooSeeker/M1A1-R2D2", "iPhone", "iPod", "Android",
             "BlackBerry9530", "LG-TU915 Obigo", "LGE VX", "webOS",
-            "Nokia5800",)
-        ),
+            "Nokia5800",)),
     ),
 )
 
@@ -521,7 +520,8 @@ register_setting(
         "COMMENTS_DISQUS_API_PUBLIC_KEY", "COMMENTS_DISQUS_API_SECRET_KEY",
         "COMMENTS_USE_RATINGS", "DEV_SERVER", "FORMS_USE_HTML5",
         "GRAPPELLI_INSTALLED", "GOOGLE_ANALYTICS_ID", "JQUERY_FILENAME",
-        "LOGIN_URL", "LOGOUT_URL", "SITE_TITLE", "SITE_TAGLINE", "USE_L10N",
+        "JQUERY_UI_FILENAME", "LOGIN_URL", "LOGOUT_URL", "SITE_TITLE",
+        "SITE_TAGLINE", "USE_L10N",
     ),
 )
 
