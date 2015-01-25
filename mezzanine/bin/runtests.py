@@ -39,8 +39,9 @@ globals().update(i for i in settings.__dict__.items() if i[0].isupper())
 
 # Require the mezzanine.accounts app. We use settings.INSTALLED_APPS here so
 # the syntax test doesn't complain about an undefined name.
-if "mezzanine.accounts" not in settings.INSTALLED_APPS:
-    INSTALLED_APPS = list(settings.INSTALLED_APPS) + ["mezzanine.accounts"]
+for extra_app in ["mezzanine.accounts", "mezzanine.mobile"]:
+    if extra_app not in settings.INSTALLED_APPS:
+        INSTALLED_APPS = list(settings.INSTALLED_APPS) + [extra_app]
 
 # Use an in-memory database for tests.
 DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3'}}
