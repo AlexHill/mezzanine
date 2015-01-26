@@ -59,11 +59,13 @@ PASSWORD_HASHERS = ('django.contrib.auth.hashers.MD5PasswordHasher',
 
 """)
 
-    def delete_temporary_files():
-        for filename in tmp_files:
-            os.remove(filename)
-            os.remove(filename + 'c')
-    atexit.register(delete_temporary_files)
+    def cleanup_test_settings():
+        for filename in tmp_files + [fn + 'c' for fn in tmp_files]:
+            try:
+                os.remove(filename)
+            except OSError:
+                pass
+    atexit.register(cleanup_test_settings)
 
     if django.VERSION >= (1, 7):
         django.setup()
